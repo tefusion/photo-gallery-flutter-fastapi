@@ -32,19 +32,19 @@ class SortMode(Enum):
     POPULARITY = 5
 
 
-def convert_sort_mode(inputString):
-    if inputString == None:
+def convert_sort_mode(input_string):
+    if input_string == None:
         return SortMode.DATE
-    sortModeStr = inputString.upper()
-    if sortModeStr == "DATE":
+    sort_mode_str = input_string.upper()
+    if sort_mode_str == "DATE":
         return SortMode.DATE
-    elif sortModeStr in ["MOST_RECENT", "DATE_REVERSE"]:
+    elif sort_mode_str in ["MOST_RECENT", "DATE_REVERSE"]:
         return SortMode.DATE_REVERSE
-    elif sortModeStr == "POPULARITY":
+    elif sort_mode_str == "POPULARITY":
         return SortMode.POPULARITY
-    elif sortModeStr == "POSITION":
+    elif sort_mode_str == "POSITION":
         return SortMode.POSITION
-    elif sortModeStr == "RANDOM":
+    elif sort_mode_str == "RANDOM":
         return SortMode.RANDOM
     else:
         return SortMode.DATE

@@ -1,51 +1,51 @@
 from lib.models import SortMode
 
 
-def get_image_list_from_server(mycursor, offset: int, count: int, sortMode: int, tag: str, randId: int):
-    returnDict = {"error": False, "sortMode": sortMode, "data": {}}
+def get_image_list_from_server(mycursor, offset: int, count: int, sort_mode: int, tag: str, random_id: int):
+    returnDict = {"error": False, "sort_mode": sort_mode, "data": {}}
     data = {}
     sqlLimit = " LIMIT %s " + f"OFFSET %s"
-    orderMode = ""
+    order_mode = ""
     if tag == None:
         sql = "SELECT * FROM image "
 
-        if sortMode == SortMode.DATE:
-            orderMode = "ORDER BY id"  # was ORDER BY time_created before
-        elif sortMode == SortMode.DATE_REVERSE:
-            orderMode = "ORDER BY id DESC"  # descending was ORDER BY time_created DESC before
-        elif sortMode == SortMode.RANDOM:
-            orderMode = "ORDER BY RAND("+str(randId)+")"
+        if sort_mode == SortMode.DATE:
+            order_mode = "ORDER BY id"  # was ORDER BY time_created before
+        elif sort_mode == SortMode.DATE_REVERSE:
+            order_mode = "ORDER BY id DESC"  # descending was ORDER BY time_created DESC before
+        elif sort_mode == SortMode.RANDOM:
+            order_mode = "ORDER BY RAND("+str(random_id)+")"
         else:
-            orderMode = "ORDER BY id"
+            order_mode = "ORDER BY id"
 
-        mycursor.execute(sql+orderMode+sqlLimit, (count, offset,))
+        mycursor.execute(sql+order_mode+sqlLimit, (count, offset,))
         rows = mycursor.fetchall()
         for count, row in enumerate(rows):
             data[count] = row
         returnDict["data"] = data
 
     else:  # for tagged search
-        if sortMode == SortMode.POSITION:
-            orderMode = "it.pos"
-        elif sortMode == SortMode.DATE:
-            orderMode = "img.id"  # was ORDER BY time_created before
-        elif sortMode == SortMode.DATE_REVERSE:
-            orderMode = "img.id DESC"  # descending was ORDER BY time_created DESC before
-        elif sortMode == SortMode.RANDOM:
-            orderMode = "RAND("+str(randId)+")"
+        if sort_mode == SortMode.POSITION:
+            order_mode = "it.pos"
+        elif sort_mode == SortMode.DATE:
+            order_mode = "img.id"  # was ORDER BY time_created before
+        elif sort_mode == SortMode.DATE_REVERSE:
+            order_mode = "img.id DESC"  # descending was ORDER BY time_created DESC before
+        elif sort_mode == SortMode.RANDOM:
+            order_mode = "RAND("+str(random_id)+")"
         else:
-            orderMode = "it.pos"
+            order_mode = "it.pos"
 
         data = {}
 
         if(tag == "_" or tag == " "):  # get all untagged images
-            if(orderMode == "it.pos"):  # TODO find better way 2 fix
-                orderMode = "img.id DESC"
+            if(order_mode == "it.pos"):  # TODO find better way 2 fix
+                order_mode = "img.id DESC"
             sql = f"""
             SELECT img.*
             FROM image img
             WHERE img.id not in (SELECT image_id FROM tagmap) 
-            ORDER BY {orderMode} 
+            ORDER BY {order_mode} 
             """
             mycursor.execute(sql+sqlLimit)
         else:  # get images with tag
@@ -55,7 +55,7 @@ def get_image_list_from_server(mycursor, offset: int, count: int, sortMode: int,
             WHERE it.tag_id = t.tag_id
             AND t.tname = %s
             AND img.id = it.image_id
-            ORDER BY {orderMode}
+            ORDER BY {order_mode}
             """
             mycursor.execute(sql+sqlLimit, (tag, count, offset,))
         rows = mycursor.fetchall()
@@ -67,25 +67,25 @@ def get_image_list_from_server(mycursor, offset: int, count: int, sortMode: int,
     return returnDict
 
 
-def get_tag_list_from_server(mycursor, offset: str, count: str, sortMode: int, randId: int, tag: str = ""):
-    returnDict = {"error": False, "sortMode": sortMode, "data": {}}
+def get_tag_list_from_server(mycursor, offset: str, count: str, sort_mode: int, random_id: int, tag: str = ""):
+    returnDict = {"error": False, "sort_mode": sort_mode, "data": {}}
     data = {}
 
-    if sortMode == SortMode.POSITION:
-        orderMode = "t.tname ASC"
-    elif sortMode == SortMode.DATE:
-        orderMode = "tm.id"  # was ORDER BY time_created before
-    elif sortMode == SortMode.DATE_REVERSE:
-        orderMode = "tm.id DESC"  # descending was ORDER BY time_created DESC before
-    elif sortMode == SortMode.RANDOM:
-        orderMode = "RAND("+str(randId)+")"
-    elif sortMode == SortMode.POPULARITY:
-        orderMode = "tmGrouped.size DESC"
+    if sort_mode == SortMode.POSITION:
+        order_mode = "t.tname ASC"
+    elif sort_mode == SortMode.DATE:
+        order_mode = "tm.id"  # was ORDER BY time_created before
+    elif sort_mode == SortMode.DATE_REVERSE:
+        order_mode = "tm.id DESC"  # descending was ORDER BY time_created DESC before
+    elif sort_mode == SortMode.RANDOM:
+        order_mode = "RAND("+str(random_id)+")"
+    elif sort_mode == SortMode.POPULARITY:
+        order_mode = "tmGrouped.size DESC"
 
         # was this previously but since query times were getting slow now just looking at highest pos
-        #orderMode = "(SELECT COUNT(tag_id) FROM tagmap WHERE tag_id=tm.tag_id GROUP BY tag_id) DESC"
+        #order_mode = "(SELECT COUNT(tag_id) FROM tagmap WHERE tag_id=tm.tag_id GROUP BY tag_id) DESC"
     else:
-        orderMode = "tmGrouped.size DESC"
+        order_mode = "tmGrouped.size DESC"
 
     if tag == "":
         sql = f"""
@@ -96,7 +96,7 @@ def get_tag_list_from_server(mycursor, offset: str, count: str, sortMode: int, r
             AND tmGrouped.tag_id=t.tag_id 
             AND tm.pos=tmGrouped.pos
             AND img.id=tm.image_id 
-            ORDER BY {orderMode}
+            ORDER BY {order_mode}
             LIMIT %s
             OFFSET %s
         """
@@ -111,7 +111,7 @@ def get_tag_list_from_server(mycursor, offset: str, count: str, sortMode: int, r
             AND tmGrouped.tag_id=t.tag_id 
             AND tm.pos=tmGrouped.pos
             AND img.id=tm.image_id 
-            ORDER BY {orderMode}
+            ORDER BY {order_mode}
             LIMIT {count}
             OFFSET {offset}
         """
@@ -126,21 +126,21 @@ def get_tag_list_from_server(mycursor, offset: str, count: str, sortMode: int, r
     return returnDict
 
 
-def get_tags_starting_with(mycursor,  tagStart: str):
+def get_tags_starting_with(mycursor,  tag_start: str):
     """
         autocomplete string
-        :param tagStart: String tag should start with
-        Returns at most 5 values starting with the specified String tagStart in the table tag ordered alphabetically
+        :param tag_start: String tag should start with
+        Returns at most 5 values starting with the specified String tag_start in the table tag ordered alphabetically
         :return {"error": False, "tags": [tag1,tag2,...]}
         """
-    tagStartLen = str(len(tagStart))
-    # gets first 5 tags starting with tagStart
+    tag_startLen = str(len(tag_start))
+    # gets first 5 tags starting with tag_start
     sql = f"""SELECT tname 
             FROM tag 
             WHERE left(tname,%s)=%s
             ORDER BY tname LIMIT 5;
         """
-    mycursor.execute(sql, (tagStartLen, tagStart,))
+    mycursor.execute(sql, (tag_startLen, tag_start,))
     tags = {"error": False, "tags": []}
     for row in mycursor:
         tags["tags"].append(row[0])  # row 0 is the tag
