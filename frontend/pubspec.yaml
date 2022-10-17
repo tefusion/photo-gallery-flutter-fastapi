@@ -1,0 +1,29 @@
+name: image_server
+description: Frontend for a MariaDB image server with a fastapi backend
+
+publish_to: "none"
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=2.7.0 <3.0.5"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  file_picker: ^4.2.7
+  http: ^0.13.4
+  dio: ^4.0.4
+  photo_view: ^0.14.0
+  panorama: ^0.4.1
+  flutter_typeahead: ^4.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  # The following line ensures that the Material Icons font is
+  # included with your application, so that you can use the icons in
+  # the material Icons class.
+  uses-material-design: true

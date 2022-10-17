@@ -1,0 +1,4 @@
+This project uses an edited version of https://pub.dev/packages/panorama for displaying images in panorama
+
+Files: ./frontend/lib/widgets/imageDisplay/Panorama/panorama.dart
+License: Apache-2.0

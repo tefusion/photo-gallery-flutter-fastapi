@@ -1,0 +1,6 @@
+fastapi
+python-multipart
+aiofiles
+mysql-connector-python
+python-dotenv
+Pillow
