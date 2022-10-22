@@ -1,14 +1,11 @@
 from fastapi.responses import FileResponse, StreamingResponse
-from fastapi import File, UploadFile
+from fastapi import File, Response, UploadFile
 
 import os
 # import PIL
 from PIL import Image
-import io
 
 import uuid
-import aiofiles
-
 
 import mysql.connector
 import datetime
@@ -18,7 +15,10 @@ from dotenv import load_dotenv
 from random import randint
 
 from lib.models import *
-from lib.data_server_get import *
+from lib.file_handler import FileHandler
+
+
+THUMBNAIL_SIZE = 200
 
 
 class ImageServer:
@@ -26,13 +26,15 @@ class ImageServer:
     Handles everything related to database
     """
 
-    def __init__(self, p_database: str):
+    def __init__(self, p_database: str, folder_path: str):
+        """Creates connection to sqlServer
+
+        Args:
+            p_database (str): data_base name like image
+            folder_path (str): path where square and Received folder are like ./Files
         """
-        Creates connection to sqlServer
-        """
-        self.directoryPath = "./Files/Received/"
-        self.thumbnailPath = "./Files/square/"
         self.random_id: int = randint(0, 1000000)
+        self.file_handler = FileHandler(folder_path)
         load_dotenv()
         PASSWORD = os.getenv("DB_PASSWORD")
         self.db = mysql.connector.connect(
@@ -42,54 +44,31 @@ class ImageServer:
             password=PASSWORD
         )
 
-    def return_image(self, image_path):
-        """
-        param image_path: str
-        returns specified file at Path
-        """
-        return FileResponse(self.directoryPath+image_path)
+    def return_image(self, image_path: str) -> FileResponse:
+        """returns specified file at Path
+        Args:
+            image_path (str): just image name
 
-    def return_thumbnail(self, image_path: str, size: int):
+        Returns:
+            FileResponse: image
+        """
+        full_image_path = self.file_handler.get_image_path(image_path)
+        if full_image_path != "":
+            return FileResponse(full_image_path, 200)
+        else:
+            file_response = Response(None, 404)
+
+    def return_thumbnail(self, image_path: str) -> FileResponse:
         """
         same as returnImage, just returns smaller square cut from it
         """
-        if os.path.isfile(self.thumbnailPath+image_path):  # if thumbnail exists return it
-            thumbnail = FileResponse(self.thumbnailPath+image_path)
-        else:  # if thumbnail doesn't exist create it, this was necessary at the start since thumbnails weren't saved previously
-            # can be removed in a future version
-            self.create_thumbnail(image_path, size)
-            thumbnail = FileResponse(self.thumbnailPath+image_path)
-
-        return thumbnail
-
-    def create_thumbnail(self, image_path: str, size: int):
-        """
-        param image_path: str
-        param size: int
-
-        Uses PILLOW/PIL.Image to cut the middle out of the image and resize it to the size to have a thumbnail in square format
-        """
-        im = Image.open(self.directoryPath+image_path)
-        width, height = im.size
-        # cut into square
-        if width > height:
-            left = width/2-height/2
-            right = width/2+height/2
-            thumbnail = im.crop((left, 0, right, height))
+        thumbnail_path = self.file_handler.get_thumbnail_path(image_path)
+        if thumbnail_path != "":
+            return FileResponse(thumbnail_path, 200)
         else:
-            top = int(height/2+width/2)
-            bottom = int(height/2-width/2)
-            thumbnail = im.crop((0, bottom, width, top))
+            return Response(None, 404)
 
-        thumbnail.thumbnail([size, size])
-
-        thumbnail.save(self.thumbnailPath+image_path)
-        # this is the option of not saving the image, but sending it directly
-        # img_byte_arr = io.BytesIO()
-        # thumbnail.save(img_byte_arr, format='PNG')
-        # return StreamingResponse(iter([img_byte_arr.getvalue()]), media_type='image/png')
-
-    def get_image_list(self, offset: int, count: int, sort_mode: int, tag: str):
+    def get_image_list(self, offset: int, count: int, sort_mode: int, tag: str) -> dict:
         """
         param offset: str (but has to actually be an int, since all gets passed in sql as a str int values already passed as str)
         param count: str: Limit count
@@ -101,9 +80,71 @@ class ImageServer:
         except:
             self.__init__()
             mycursor = self.db.cursor(dictionary=True)
-        return get_image_list_from_server(mycursor, offset=offset, count=count, sort_mode=sort_mode, tag=tag, random_id=self.random_id)
+        returnDict = {"sort_mode": sort_mode, "data": {}}
+        data = {}
+        sqlLimit = " LIMIT %s " + f"OFFSET %s"
+        order_mode = ""
+        if tag == None:
+            sql = "SELECT * FROM image "
 
-    def get_tag_list(self, offset: int, count: int, sort_mode: int, tag: str = ""):
+            if sort_mode == SortMode.DATE:
+                order_mode = "ORDER BY id"  # was ORDER BY time_created before
+            elif sort_mode == SortMode.DATE_REVERSE:
+                order_mode = "ORDER BY id DESC"  # descending was ORDER BY time_created DESC before
+            elif sort_mode == SortMode.RANDOM:
+                order_mode = "ORDER BY RAND("+str(self.random_id)+")"
+            else:
+                order_mode = "ORDER BY id"
+
+            mycursor.execute(sql+order_mode+sqlLimit, (count, offset,))
+            rows = mycursor.fetchall()
+            for count, row in enumerate(rows):
+                data[count] = row
+            returnDict["data"] = data
+
+        else:  # for tagged search
+            if sort_mode == SortMode.POSITION:
+                order_mode = "it.pos"
+            elif sort_mode == SortMode.DATE:
+                order_mode = "img.id"  # was ORDER BY time_created before
+            elif sort_mode == SortMode.DATE_REVERSE:
+                order_mode = "img.id DESC"  # descending was ORDER BY time_created DESC before
+            elif sort_mode == SortMode.RANDOM:
+                order_mode = "RAND("+str(self.random_id)+")"
+            else:
+                order_mode = "it.pos"
+
+            data = {}
+
+            if (tag == "_" or tag == " "):  # get all untagged images
+                if (order_mode == "it.pos"):  # TODO find better way 2 fix
+                    order_mode = "img.id DESC"
+                sql = f"""
+                SELECT img.*
+                FROM image img
+                WHERE img.id not in (SELECT image_id FROM tagmap) 
+                ORDER BY {order_mode} 
+                """
+                mycursor.execute(sql+sqlLimit)
+            else:  # get images with tag
+                sql = f"""
+                SELECT img.*
+                FROM tagmap it, image img, tag t
+                WHERE it.tag_id = t.tag_id
+                AND t.tname = %s
+                AND img.id = it.image_id
+                ORDER BY {order_mode}
+                """
+                mycursor.execute(sql+sqlLimit, (tag, count, offset,))
+            rows = mycursor.fetchall()
+            for count, row in enumerate(rows):
+                data[count] = row
+            returnDict["data"] = data
+
+        mycursor.close()
+        return returnDict
+
+    def get_tag_list(self, offset: int, count: int, sort_mode: int, tag: str = "") -> dict:
         """
         params: offset, count, sort_mode
         gets tagList with thumbnails from sql server
@@ -113,29 +154,86 @@ class ImageServer:
         except:
             self.__init__()
             mycursor = self.db.cursor(dictionary=True)
-        return get_tag_list_from_server(mycursor, offset=offset, count=count, sort_mode=sort_mode, random_id=self.random_id, tag=tag)
 
-    def add_to_image_table(self, file_name, fileData: FileData, tag=""):
+        returnDict = {"sort_mode": sort_mode, "data": {}}
+        data = {}
+
+        if sort_mode == SortMode.POSITION:
+            order_mode = "t.tname ASC"
+        elif sort_mode == SortMode.DATE:
+            order_mode = "tm.id"  # was ORDER BY time_created before
+        elif sort_mode == SortMode.DATE_REVERSE:
+            order_mode = "tm.id DESC"  # descending was ORDER BY time_created DESC before
+        elif sort_mode == SortMode.RANDOM:
+            order_mode = "RAND("+str(random_id)+")"
+        elif sort_mode == SortMode.POPULARITY:
+            order_mode = "tmGrouped.size DESC"
+
+            # was this previously but since query times were getting slow now just looking at highest pos
+            #order_mode = "(SELECT COUNT(tag_id) FROM tagmap WHERE tag_id=tm.tag_id GROUP BY tag_id) DESC"
+        else:
+            order_mode = "tmGrouped.size DESC"
+
+        if tag == "":
+            sql = f"""
+            SELECT  img.file_path, img.id, tm.tag_id, t.tname
+            FROM (SELECT MIN(pos) AS pos, tag_id, MAX(pos) as size FROM tagmap GROUP BY tag_id) tmGrouped,
+                tag t, image img, tagmap tm
+            WHERE tmGrouped.tag_id=tm.tag_id
+                AND tmGrouped.tag_id=t.tag_id 
+                AND tm.pos=tmGrouped.pos
+                AND img.id=tm.image_id 
+                ORDER BY {order_mode}
+                LIMIT %s
+                OFFSET %s
+            """
+            mycursor.execute(sql, (count, offset,))
+        else:
+            sql = f"""
+            SELECT  img.file_path, img.id, tm.tag_id, t.tname
+            FROM (SELECT MIN(pos) AS pos, tag_id, MAX(pos) as size FROM tagmap GROUP BY tag_id) tmGrouped,
+                tag t, image img, tagmap tm
+            WHERE left(t.tname, %s)=%s
+                AND tmGrouped.tag_id=tm.tag_id
+                AND tmGrouped.tag_id=t.tag_id 
+                AND tm.pos=tmGrouped.pos
+                AND img.id=tm.image_id 
+                ORDER BY {order_mode}
+                LIMIT {count}
+                OFFSET {offset}
+            """
+            mycursor.execute(sql, (len(tag), tag, ))
+
+        rows = mycursor.fetchall()
+        for count, row in enumerate(rows):
+            data[count] = row
+
+        returnDict["data"] = data
+        mycursor.close()
+        return returnDict
+
+    def add_image_to_table(self, file_name: str, title: str, description: str) -> int:
+        """Call after saving file for both image and thumbnail
+
+        Args:
+            file_name (str):
+            title (str): 
+            description (str): 
+            tag (str, optional):. Defaults to "".
+        """
         mycursor = self.db.cursor()
-
-        if tag != "" and tag != " ":
-            tag_data = TagData(tag=tag, images=[])
-
         now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         sql = "INSERT INTO image (title, description, file_path, time_created) VALUES (%s, %s, %s, %s)"
-        val = (fileData.title, fileData.description, file_name, now)
+        val = (title, description, file_name, now)
         mycursor.execute(sql, val)
-        if tag != "" and tag != " ":
-            tag_data.images.append(mycursor.lastrowid)
+
+        image_id = mycursor.lastrowid
         self.db.commit()
         mycursor.close()
-        if tag != "" and tag != " ":
-            self.tagImages(tag_data=tag_data)
+        return image_id
 
     # for multiple images:
-
     async def upload_multiple_images(self, multi_file_data: MultiFileData):
-
         file_names = []
         for file in multi_file_data.files:
             fileNameArr = file.filename.split(".")
@@ -143,67 +241,49 @@ class ImageServer:
             if multi_file_data.compressed == False:
                 new_filename = str(uuid.uuid4())+"." + \
                     fileNameArr[len(fileNameArr)-1]
-                await self.save_file(file, new_filename)
-                self.create_thumbnail(new_filename, 200)
+                await self.file_handler.save_file(file, new_filename)
+                self.file_handler.create_thumbnail(
+                    new_filename, THUMBNAIL_SIZE)
                 file_names.append(new_filename)
             else:  # in compressed mode all images saved as jpeg
                 new_filename = str(uuid.uuid4())+".jpg"
-                await self.save_file_compressed(file, new_filename)
-                self.create_thumbnail(new_filename, 200)
+                await self.file_handler.save_file_compressed(file, new_filename)
+                self.file_handler.create_thumbnail(
+                    new_filename, THUMBNAIL_SIZE)
                 file_names.append(new_filename)
 
         self.add_multiple_images_to_table(
             file_names, multi_file_data.title, multi_file_data.description, multi_file_data.tag)
 
     def add_multiple_images_to_table(self, file_names, title, description, tag):
-        try:
-            mycursor = self.db.cursor()
-        except Exception as e:
-            self.__init__()
-            mycursor = self.db.cursor(dictionary=True)
-
-        now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         if tag != "" and tag != " ":
             tag_data = TagData(tag=tag, images=[])
         for file_name in file_names:
-            sql = "INSERT INTO image (title, description, file_path, time_created) VALUES (%s, %s, %s, %s)"
-            val = (title, description, file_name, now)
-            mycursor.execute(sql, val)
+            image_id = self.add_image_to_table(file_name, title, description)
             if tag != "" and tag != " ":
-                tag_data.images.append(mycursor.lastrowid)
-        self.db.commit()
-        mycursor.close()
+                tag_data.images.append(image_id)
+
         if tag != "" and tag != " ":
             self.tag_images(tag_data=tag_data)
 
-    def delete_image(self, image_id: str):
+    def delete_image(self, image_id: int):
         mycursor = self.db.cursor()
-        mycursor.execute("SELECT file_path FROM image WHERE id="+image_id)
+        mycursor.execute(
+            "SELECT file_path FROM image WHERE id=%s", (image_id, ))
         try:
             for row in mycursor:
                 file_path = row[0]
-            mycursor.execute("DELETE FROM image WHERE id="+image_id)
-            mycursor.execute("DELETE FROM tagmap WHERE image_id="+image_id)
+            mycursor.execute("DELETE FROM image WHERE id=%s", (image_id, ))
+            mycursor.execute(
+                "DELETE FROM tagmap WHERE image_id=%s", (image_id,))
             self.db.commit()
-            os.remove(self.directoryPath+file_path)
-            os.remove(self.thumbnailPath+file_path)
+            self.file_handler.remove_image(file_path)
 
         except:
             pass
 
         finally:
             mycursor.close()
-
-    async def save_file(self, file, new_filename):
-        async with aiofiles.open(self.directoryPath+new_filename, 'wb') as out_file:
-            content = await file.read()  # async read
-            await out_file.write(content)  # async write
-
-    async def save_file_compressed(self, file, new_filename):
-        tempFile = file.file
-        im = Image.open(io.BytesIO(tempFile.read()))
-        im.convert("RGB").save(self.directoryPath+new_filename,
-                               format="JPEG", quality=70, optimize=True)
 
     def add_new_tag(self, tagname: str):
         """
@@ -231,7 +311,6 @@ class ImageServer:
         Adds images in tag_data.images to tag_data.tag in tagmap
         """
         mycursor = self.db.cursor()
-        # make better way to do this .-.
         # this is just a quick check if the tag even exists
         # if it doesn't just add the first image to it so it actually exists
         tag_id = self.find_tag_id(tag_data.tag)
@@ -274,7 +353,7 @@ class ImageServer:
         mycursor = self.db.cursor()
         tag_id = self.find_tag_id(tag_data.tag)
         if tag_id == None:
-            return {"error": "Tag doesn't exist"}
+            return {}
 
         for image_id in tag_data.images:
             sql = f"""
@@ -285,17 +364,29 @@ class ImageServer:
             mycursor.execute(sql)
         self.db.commit()
         mycursor.close()
-        return {"error": False}
+        return {}
 
-    def get_tags_starting_with_pattern(self, pattern: str):
+    def get_tags_starting_with_pattern(self, tag_start: str):
         """
         autocomplete string
-        :param tagStart: String tag should start with
+        :param tag_start: String tag should start with
         Returns at most 5 values starting with the specified String tagStart in the table tag ordered alphabetically
-        :return {"error": False, "tags": [tag1,tag2,...]}
+        :return {"tags": [tag1,tag2,...]}
         """
         mycursor = self.db.cursor()
-        return get_tags_starting_with(mycursor, pattern)
+        tag_start_len = str(len(tag_start))
+        # gets first 5 tags starting with tag_start
+        sql = f"""SELECT tname 
+                FROM tag 
+                WHERE left(tname,%s)=%s
+                ORDER BY tname LIMIT 5;
+            """
+        mycursor.execute(sql, (tag_start_len, tag_start,))
+        tags = {"tags": []}
+        for row in mycursor:
+            tags["tags"].append(row[0])  # row 0 is the tag
+        mycursor.close()
+        return tags
 
     def change_tag_name(self, old_tag_name, new_tag_name):
         """
@@ -312,7 +403,7 @@ class ImageServer:
             self.db.commit()
 
         except Exception as e:
-            return {"error": e}
+            return {}
         finally:
             mycursor.close()
 
@@ -323,10 +414,7 @@ class ImageServer:
     # TODO add different modes
     def reorder_images(self, id_ship, id_destination, mode, tagname):
         mycursor = self.db.cursor()
-
         # drag Ship in front of destination
-        sql = f"CALL dragInFrontOfOtherImage({id_ship}, {id_destination}, '{tagname}')"
-        val = (id_ship, id_destination, tagname)
         mycursor.callproc('dragInFrontOfOtherImage',
                           args=(id_ship, id_destination, tagname))
 

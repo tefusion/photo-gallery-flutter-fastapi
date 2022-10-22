@@ -13,12 +13,7 @@ class ImageTile extends StatelessWidget {
   final Function showImagePopup;
 
   Future<ImageProvider<Object>> fetchThumbnail() async {
-    return Image.network(backend.baseUrl +
-            "/t/" +
-            imageData.url +
-            "?size=" +
-            thumbnailSize.toInt().toString())
-        .image;
+    return Image.network(backend.baseUrl + "/t/" + imageData.url).image;
   }
 
   const ImageTile({

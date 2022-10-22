@@ -19,7 +19,7 @@ app.add_middleware(
 )
 
 
-imageServer = ImageServer("images")
+imageServer = ImageServer("images", "./files")
 
 systemInfo = SystemInfo()
 
@@ -33,8 +33,8 @@ def get_File(path):
 
 
 @app.get("/t/{path}")
-def get_Thumbnail(path: str, size: int = 100):
-    return imageServer.return_thumbnail(path, size)
+def get_Thumbnail(path: str):
+    return imageServer.return_thumbnail(path)
 
 
 @app.get("/imagelist/{count}/{offset}")
@@ -54,11 +54,6 @@ async def autocomplete(tag_start: str = ""):
     return imageServer.get_tags_starting_with_pattern(tag_start)
 
 
-@app.post("/files/")
-async def create_file(file: bytes = File(...)):
-    return {"file_size": len(file)}
-
-
 @app.post("/images/")  # multiple
 async def upload_images(title: str = Form(...), description: str = Form(...),
                         files: List[UploadFile] = File(...), tag: str = Form(...), compressed: Optional[bool] = None):
@@ -66,21 +61,20 @@ async def upload_images(title: str = Form(...), description: str = Form(...),
         title=title, description=description, files=files, tag=tag, compressed=compressed)
     # would be better in imageServer, but since this is a
     await imageServer.upload_multiple_images(multiFileData)
-    # project meant for private/home usage I don't check every exception
-    return {"error": False}
+    return Response(None, 200)
 
 
 @app.delete("/image/{image_id}")
 async def delete_image(image_id: str):
     imageServer.delete_image(image_id)
-    return {"error": False}
+    return Response(None, 200)
 
 
 @app.post("/tag/")
 async def tag_images(tag: str = Form(...), images: List[int] = Form(...)):
     tagData = TagData(tag=tag, images=images)
     imageServer.tag_images(tagData)
-    return {"error": False}
+    return Response(None, 200)
 
 
 @app.post("/untag/")
@@ -92,7 +86,7 @@ async def untag_images(tag: str = Form(...), images: List[int] = Form(...)):
 @app.put("/reorder/{tagname}/{idShip}")
 async def reorder_images(tagname: str, idShip: int, idDestination: int, mode: int = 1):
     imageServer.reorder_images(idShip, idDestination, mode, tagname)
-    return {"error": False}
+    return Response(None, 200)
 
 
 @app.put("/tagname/{oldTagName}")
@@ -103,7 +97,7 @@ async def change_tag_name(oldTagName: str = "", newTagName: str = ""):
 @app.get("/randomize")
 def set_new_random_seed():
     imageServer.set_new_rand_seed()
-    return {"error": False}
+    return Response(None, 200)
 
 
 @app.get("/disk_usage")

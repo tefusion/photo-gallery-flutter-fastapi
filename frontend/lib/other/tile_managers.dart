@@ -42,7 +42,7 @@ class ImageManager extends TileManager {
   }
 
   fetchTileList(TileFetchData tileFetchData) async {
-    String sortMode = "?sortMode=";
+    String sortMode = "?sort_mode=";
     switch (tileFetchData.sortMode) {
       case 0:
         {
@@ -156,7 +156,7 @@ class TagTileManager extends TileManager {
   }
 
   fetchTileList(TileFetchData tileFetchData) async {
-    String sortMode = "?sortMode=";
+    String sortMode = "?sort_mode=";
     switch (tileFetchData.sortMode) {
       case 0:
         {

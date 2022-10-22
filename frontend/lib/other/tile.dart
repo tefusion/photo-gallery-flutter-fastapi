@@ -18,12 +18,7 @@ class Tile extends StatelessWidget {
   final Function onTileClicked;
 
   Future<ImageProvider<Object>> fetchThumbnail() async {
-    return Image.network(backend.baseUrl +
-            "/t/" +
-            tileData.url +
-            "?size=" +
-            thumbnailSize.toInt().toString())
-        .image;
+    return Image.network(backend.baseUrl + "/t/" + tileData.url).image;
   }
 
   const Tile(

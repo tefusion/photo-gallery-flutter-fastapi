@@ -198,11 +198,4 @@ class _SortModeButtonState extends State<SortModeButton> {
   }
 }
 
-/*
-<String>['Most recent', "By date"].map<DropdownMenuItem<String>>((String value){
-        return DropdownMenuItem<String>(value: value, child: Text(value),);
-
-      }).toList()
-*/
-
 enum ManagerIndex { tag, image }
