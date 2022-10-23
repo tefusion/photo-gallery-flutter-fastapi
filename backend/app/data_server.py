@@ -14,8 +14,8 @@ from dotenv import load_dotenv
 
 from random import randint
 
-from lib.models import *
-from lib.file_handler import FileHandler
+from models import *
+from file_storage_handler import FileStorageHandler
 
 
 THUMBNAIL_SIZE = 200
@@ -34,7 +34,7 @@ class ImageServer:
             folder_path (str): path where square and Received folder are like ./Files
         """
         self.random_id: int = randint(0, 1000000)
-        self.file_handler = FileHandler(folder_path)
+        self.file_handler = FileStorageHandler(folder_path)
         load_dotenv()
         PASSWORD = os.getenv("DB_PASSWORD")
         self.db = mysql.connector.connect(
@@ -80,7 +80,7 @@ class ImageServer:
         except:
             self.__init__()
             mycursor = self.db.cursor(dictionary=True)
-        returnDict = {"sort_mode": sort_mode, "data": {}}
+        return_dict = {"sort_mode": sort_mode, "data": {}}
         data = {}
         sqlLimit = " LIMIT %s " + f"OFFSET %s"
         order_mode = ""
@@ -100,7 +100,7 @@ class ImageServer:
             rows = mycursor.fetchall()
             for count, row in enumerate(rows):
                 data[count] = row
-            returnDict["data"] = data
+            return_dict["data"] = data
 
         else:  # for tagged search
             if sort_mode == SortMode.POSITION:
@@ -139,10 +139,10 @@ class ImageServer:
             rows = mycursor.fetchall()
             for count, row in enumerate(rows):
                 data[count] = row
-            returnDict["data"] = data
+            return_dict["data"] = data
 
         mycursor.close()
-        return returnDict
+        return return_dict
 
     def get_tag_list(self, offset: int, count: int, sort_mode: int, tag: str = "") -> dict:
         """
@@ -155,7 +155,7 @@ class ImageServer:
             self.__init__()
             mycursor = self.db.cursor(dictionary=True)
 
-        returnDict = {"sort_mode": sort_mode, "data": {}}
+        return_dict = {"sort_mode": sort_mode, "data": {}}
         data = {}
 
         if sort_mode == SortMode.POSITION:
@@ -208,9 +208,9 @@ class ImageServer:
         for count, row in enumerate(rows):
             data[count] = row
 
-        returnDict["data"] = data
+        return_dict["data"] = data
         mycursor.close()
-        return returnDict
+        return return_dict
 
     def add_image_to_table(self, file_name: str, title: str, description: str) -> int:
         """Call after saving file for both image and thumbnail
@@ -241,19 +241,21 @@ class ImageServer:
             if multi_file_data.compressed == False:
                 new_filename = str(uuid.uuid4())+"." + \
                     fileNameArr[len(fileNameArr)-1]
-                await self.file_handler.save_file(file, new_filename)
+                self.file_handler.save_file(file.file, new_filename)
                 self.file_handler.create_thumbnail(
                     new_filename, THUMBNAIL_SIZE)
                 file_names.append(new_filename)
             else:  # in compressed mode all images saved as jpeg
                 new_filename = str(uuid.uuid4())+".jpg"
-                await self.file_handler.save_file_compressed(file, new_filename)
+                self.file_handler.save_file_compressed(file.file, new_filename)
                 self.file_handler.create_thumbnail(
                     new_filename, THUMBNAIL_SIZE)
                 file_names.append(new_filename)
 
         self.add_multiple_images_to_table(
             file_names, multi_file_data.title, multi_file_data.description, multi_file_data.tag)
+
+        return {"images": file_names}
 
     def add_multiple_images_to_table(self, file_names, title, description, tag):
         if tag != "" and tag != " ":

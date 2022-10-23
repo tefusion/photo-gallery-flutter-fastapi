@@ -3,8 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi import Form
 
 
-from lib.data_server import *
-from lib.system_info import SystemInfo
+from data_server import *
+from system_info import SystemInfo
 
 
 app = FastAPI()
@@ -18,8 +18,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-imageServer = ImageServer("images", "./files")
+# change to test_images for running tests
+#imageServer = ImageServer("images", "./files")
+imageServer = ImageServer("test_images", "./test/files")
 
 systemInfo = SystemInfo()
 
@@ -37,13 +38,13 @@ def get_Thumbnail(path: str):
     return imageServer.return_thumbnail(path)
 
 
-@app.get("/imagelist/{count}/{offset}")
+@app.get("/imagelist/{count}/{offset}", response_model=ImageListResponse)
 async def get_image_list(count: int, offset: int, sort_mode: str = None, tag: str = None):
     sort_mode_type = convert_sort_mode(sort_mode)
     return imageServer.get_image_list(offset, count, sort_mode_type, tag)
 
 
-@app.get("/taglist/{count}/{offset}")
+@app.get("/taglist/{count}/{offset}", response_model=TagListResponse)
 async def get_tag_list(count: int, offset: int, sort_mode: str = None, tag: str = ""):
     sort_mode_type = convert_sort_mode(sort_mode)
     return imageServer.get_tag_list(offset, count, sort_mode_type, tag)
@@ -54,14 +55,12 @@ async def autocomplete(tag_start: str = ""):
     return imageServer.get_tags_starting_with_pattern(tag_start)
 
 
-@app.post("/images/")  # multiple
+@app.post("/images/", response_model=UploadedImagesResponse)  # multiple
 async def upload_images(title: str = Form(...), description: str = Form(...),
                         files: List[UploadFile] = File(...), tag: str = Form(...), compressed: Optional[bool] = None):
-    multiFileData = MultiFileData(
+    multi_file_data = MultiFileData(
         title=title, description=description, files=files, tag=tag, compressed=compressed)
-    # would be better in imageServer, but since this is a
-    await imageServer.upload_multiple_images(multiFileData)
-    return Response(None, 200)
+    return await imageServer.upload_multiple_images(multi_file_data)
 
 
 @app.delete("/image/{image_id}")
@@ -103,3 +102,11 @@ def set_new_random_seed():
 @app.get("/disk_usage")
 def get_disk_usage():
     return systemInfo.get_disk_usage()
+
+
+@app.post("/image/", response_model=UploadedImagesResponse)
+async def upload_image(files: List[UploadFile] = File(...)):
+    # method to allow single file upload for testing
+    multi_file_data = MultiFileData(
+        title="title", description="description", files=files, tag="", compressed=False)
+    return await imageServer.upload_multiple_images(multi_file_data)

@@ -3,6 +3,35 @@ from pydantic import BaseModel
 from typing import Optional, List
 
 from enum import Enum
+import inspect
+from typing import Type
+from pydantic import BaseModel
+from fastapi import Form
+
+
+def as_form(cls: Type[BaseModel]):
+    """
+    Adds an as_form class method to decorated models. The as_form class method
+    can be used with FastAPI endpoints
+    """
+    new_params = [
+        inspect.Parameter(
+            field.alias,
+            inspect.Parameter.POSITIONAL_ONLY,
+            default=(Form(field.default) if not field.required else Form(...)),
+        )
+        for field in cls.__fields__.values()
+    ]
+
+    async def _as_form(**data):
+        return cls(**data)
+
+    sig = inspect.signature(_as_form)
+    sig = sig.replace(parameters=new_params)
+    _as_form.__signature__ = sig
+    setattr(cls, "as_form", _as_form)
+    return cls
+# Upload models
 
 
 class FileData(BaseModel):
@@ -11,6 +40,7 @@ class FileData(BaseModel):
     file: UploadFile = File(...)
 
 
+@as_form
 class MultiFileData(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
@@ -48,3 +78,18 @@ def convert_sort_mode(input_string):
         return SortMode.RANDOM
     else:
         return SortMode.DATE
+
+
+# Response models
+class UploadedImagesResponse(BaseModel):
+    images: List[str]
+
+
+class ImageListResponse(BaseModel):
+    sort_mode: SortMode
+    data: dict
+
+
+class TagListResponse(BaseModel):
+    sort_mode: SortMode
+    data: dict

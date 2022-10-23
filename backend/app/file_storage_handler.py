@@ -2,25 +2,24 @@
 Contains functions to cut thumbnails and save an image at a specified path
 """
 
+from genericpath import isfile
+import typing
 from PIL import Image
 import io
-import aiofiles
 import os
 
 
-class FileHandler:
+class FileStorageHandler:
     def __init__(self, folder_path) -> None:
         self.directory_path = folder_path+"/received/"
         self.thumbnail_path = folder_path+"/square/"
 
-    async def save_file(self, file, new_filename):
-        async with aiofiles.open(self.directory_path+new_filename, 'wb') as out_file:
-            content = await file.read()  # async read
-            await out_file.write(content)  # async write
+    def save_file(self, file: typing.BinaryIO, new_filename):
+        with open(self.directory_path+new_filename, "wb") as buffer:
+            buffer.write(file.read())
 
-    async def save_file_compressed(self, file, new_filename):
-        tempFile = file.file
-        im = Image.open(io.BytesIO(tempFile.read()))
+    def save_file_compressed(self, file:  typing.BinaryIO, new_filename):
+        im = Image.open(io.BytesIO(file.read()))
         im.convert("RGB").save(self.directory_path+new_filename,
                                format="JPEG", quality=70, optimize=True)
 
@@ -56,8 +55,19 @@ class FileHandler:
         if os.path.isfile(self.thumbnail_path+image_path):
             return self.thumbnail_path+image_path
 
-    def get_image_path(self, image_path):
-        return self.directory_path+image_path
+    def get_image_path(self, image_path: str):
+        """
+
+        Args:
+            image_path (str):
+
+        Returns:
+            _type_: returns either the image path or "" if file doesn't exist
+        """
+        if os.path.isfile(self.directory_path+image_path):
+            return self.directory_path+image_path
+        else:
+            return ""
 
     def remove_image(self, file_path):
         os.remove(self.directory_path+file_path)
