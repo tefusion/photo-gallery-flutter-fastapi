@@ -14,8 +14,8 @@ from dotenv import load_dotenv
 
 from random import randint
 
-from models import *
-from file_storage_handler import FileStorageHandler
+from app.models import *
+from app.file_storage_handler import FileStorageHandler
 
 
 THUMBNAIL_SIZE = 200
@@ -56,7 +56,8 @@ class ImageServer:
         if full_image_path != "":
             return FileResponse(full_image_path, 200)
         else:
-            file_response = Response(None, 404)
+            failed_response = Response(None, 404)
+            return failed_response
 
     def return_thumbnail(self, image_path: str) -> FileResponse:
         """

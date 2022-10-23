@@ -3,8 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi import Form
 
 
-from data_server import *
-from system_info import SystemInfo
+from app.data_server import *
+from app.system_info import SystemInfo
 
 
 app = FastAPI()
@@ -34,7 +34,7 @@ def get_File(path):
 
 
 @app.get("/t/{path}")
-def get_Thumbnail(path: str):
+def get_thumbnail(path: str):
     return imageServer.return_thumbnail(path)
 
 

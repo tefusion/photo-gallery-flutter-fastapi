@@ -51,9 +51,18 @@ class FileStorageHandler:
         # return StreamingResponse(iter([img_byte_arr.getvalue()]), media_type='image/png')
 
     def get_thumbnail_path(self, image_path: str) -> str:
-        # if thumbnail exists return it
+        """Checks if thumbnail exists and returns path to it
+
+        Args:
+            image_path (str): file_name
+
+        Returns:
+            str: Returns path for FileResponse or "" if thumbnail doesn't exist
+        """
         if os.path.isfile(self.thumbnail_path+image_path):
             return self.thumbnail_path+image_path
+        else:
+            return ""
 
     def get_image_path(self, image_path: str):
         """
