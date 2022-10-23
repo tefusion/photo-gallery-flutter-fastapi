@@ -32,7 +32,7 @@ class TileGridView extends StatefulWidget {
   final double thumbnailSize;
   final SelectMode selectMode;
   final Color selectColor;
-  final Function(int) changetoSelectImages;
+  final Function(String) changetoSelectImages;
   final Function() hideTagSearch;
   final List<String> tags;
 

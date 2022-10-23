@@ -48,7 +48,7 @@ class _TagSearchBarState extends State<TagSearchBar> {
         tagButtonIcon = Icons.add_a_photo;
       });
     }
-    var response = await backend.get("/autocomplete?tagStart=" + pattern);
+    var response = await backend.get("/autocomplete?tag_start=" + pattern);
     var data = json.decode(utf8.decode(response.bodyBytes));
     return data["tags"];
   }

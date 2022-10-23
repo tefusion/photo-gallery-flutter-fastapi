@@ -191,7 +191,7 @@ class ImageServer:
             mycursor.execute(sql, (count, offset,))
         else:
             sql = f"""
-            SELECT  img.file_path, img.id, tm.tag_id, t.tname
+            SELECT  img.uuid, img.type, tm.tag_id, t.tname
             FROM (SELECT MIN(pos) AS pos, tag_id, MAX(pos) as size FROM tagmap GROUP BY tag_id) tmGrouped,
                 tag t, image img, tagmap tm
             WHERE left(t.tname, %s)=%s

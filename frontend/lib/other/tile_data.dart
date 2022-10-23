@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class TileData {
-  final int id;
+  final String id;
   final String url;
   Color overlay; //set value not out of database
 
@@ -9,15 +9,15 @@ class TileData {
 
   factory TileData.fromJson(Map<String, dynamic> json) {
     return TileData(
-        id: json['id'],
-        url: json['file_path'],
+        id: json['uuid'],
+        url: json['uuid'] + "." + json["type"],
         //maybe solve differently
         overlay: Colors.transparent);
   }
 }
 
 class ImageData extends TileData {
-  final int id;
+  final String id;
   final String title;
   final String description;
   final String url;
@@ -42,10 +42,10 @@ class ImageData extends TileData {
       comic = true;
     }
     return ImageData(
-        id: json['id'],
+        id: json['uuid'],
         title: json['title'],
         description: json['description'],
-        url: json['file_path'],
+        url: json['uuid'] + "." + json["type"],
         comic: comic,
         timeCreated: json['time_created'],
 
@@ -55,7 +55,7 @@ class ImageData extends TileData {
 }
 
 class TagData extends TileData {
-  final int id;
+  final String id;
   final String name;
   final String url;
   Color overlay; //set value not out of database
@@ -64,9 +64,9 @@ class TagData extends TileData {
 
   factory TagData.fromJson(Map<String, dynamic> json) {
     return TagData(
-        id: json['tag_id'],
+        id: json['tname'],
         name: json['tname'],
-        url: json['file_path'],
+        url: json['uuid'] + "." + json["type"],
 
         //maybe solve differently
         overlay: Colors.transparent);

@@ -31,19 +31,19 @@ class _ImageViewerState extends State<ImageViewer> {
   SelectMode selectMode = SelectMode.none;
   bool tagSearchVisible = true;
   Color selectColor = Colors.red;
-  List<int> toDeleteImages =
+  List<String> toDeleteImages =
       []; //couldve made in one variable, but just in case so I don't delete stuff by tagging it im gonna make it obviously different
-  List<int> toTagImages = [];
+  List<String> toTagImages = [];
   List<String> tags;
 
   final TileGridViewController _tileGridViewController =
       TileGridViewController();
 //reorder stuff
-  List<int> toSwapImages = []; //used for both swapping and dragNDrop images
+  List<String> toSwapImages = []; //used for both swapping and dragNDrop images
   //delete Functions
 
   ///updates List of images that will be deleted upon another click of trash can button
-  changeToDeleteImages(int id) {
+  changeToDeleteImages(String id) {
     if (toDeleteImages.contains(id)) {
       toDeleteImages.remove(id);
     } else {
@@ -52,7 +52,7 @@ class _ImageViewerState extends State<ImageViewer> {
   }
 
   ///called after click of IconButton with icon delete_sharp -> requests server to delete images one by one
-  deleteImagesFromServer(List<int> toDeleteImages) {
+  deleteImagesFromServer(List<String> toDeleteImages) {
     toDeleteImages.forEach((imageId) {
       backend.delete("/image/" + imageId.toString());
     });
@@ -60,7 +60,7 @@ class _ImageViewerState extends State<ImageViewer> {
 
   //Tag stuff
   ///updates List of images that will be tagged with current value of tagSearch upon additional click on camera icon button
-  changeToTagImages(int id) {
+  changeToTagImages(String id) {
     if (toTagImages.contains(id)) {
       toTagImages.remove(id);
     } else {
@@ -69,7 +69,7 @@ class _ImageViewerState extends State<ImageViewer> {
   }
 
   ///requests server to tag images within toTagImages with tag from searchBar
-  tagImagesOnServer(List<int> toTagImages, String tag) async {
+  tagImagesOnServer(List<String> toTagImages, String tag) async {
     FormData tagData =
         new FormData.fromMap({"tag": tag, "images": toTagImages});
     try {
@@ -81,7 +81,7 @@ class _ImageViewerState extends State<ImageViewer> {
 
   ///requests server to untag images within to(Un)TagImages with tag from searchBar
   ///if tag from search bar is same with current tag search value
-  untagImagesOnServer(List<int> toTagImages, String tag) async {
+  untagImagesOnServer(List<String> toTagImages, String tag) async {
     FormData tagData =
         new FormData.fromMap({"tag": tag, "images": toTagImages});
     try {
@@ -93,7 +93,7 @@ class _ImageViewerState extends State<ImageViewer> {
 
   //reorderStuff
   ///updates List from selection in TiledGridView
-  changeToSwapImages(int id) {
+  changeToSwapImages(String id) {
     if (toSwapImages.contains(id)) {
       toSwapImages.remove(id);
     } else {
@@ -104,9 +104,9 @@ class _ImageViewerState extends State<ImageViewer> {
       backend.put("/reorder/" +
           tags[0] +
           "/" +
-          (toSwapImages[0]).toString() +
-          "?idDestination=" +
-          toSwapImages[1].toString() +
+          (toSwapImages[0]) +
+          "?uuid_destination=" +
+          toSwapImages[1] +
           "&mode=1"); //maybe add more modes mode 1 currently just dragNDrop
       setState(() {
         selectMode = SelectMode.none;

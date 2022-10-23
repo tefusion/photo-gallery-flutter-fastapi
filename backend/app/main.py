@@ -19,8 +19,8 @@ app.add_middleware(
 )
 
 # change to test_images for running tests
-#imageServer = ImageServer("images", "./files")
-imageServer = ImageServer("test_images", "./test/files")
+imageServer = ImageServer("images", "./files")
+#imageServer = ImageServer("test_images", "./test/files")
 
 systemInfo = SystemInfo()
 
@@ -57,7 +57,7 @@ async def autocomplete(tag_start: str = ""):
 
 @app.post("/images/", response_model=UploadedImagesResponse)  # multiple
 async def upload_images(title: str = Form(...), description: str = Form(...),
-                        files: List[UploadFile] = File(...), tag: str = Form(...), compressed: Optional[bool] = None):
+                        files: List[UploadFile] = File(...), tag: str = Form(...), compressed: Optional[bool] = False):
     multi_file_data = MultiFileData(
         title=title, description=description, files=files, tag=tag, compressed=compressed)
     return await imageServer.upload_multiple_images(multi_file_data)
@@ -80,7 +80,7 @@ async def untag_images(tag: str = Form(...), images: List[str] = Form(...)):
     return imageServer.remove_image_from_tag(tagData)
 
 
-@app.put("/reorder/{tagname}/{idShip}")
+@app.put("/reorder/{tagname}/{uuid_ship}")
 async def reorder_images(tagname: str, uuid_ship: str, uuid_destination: str, mode: int = 1):
     return imageServer.reorder_images(uuid_ship, uuid_destination, mode, tagname)
 
