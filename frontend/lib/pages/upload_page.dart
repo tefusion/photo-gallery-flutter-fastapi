@@ -187,10 +187,11 @@ uploadFilesWeb(UploadFilesData data, List<PlatformFile> files) async {
 /// unified method for uploading files, might need to convert to MultipartFile array first
 uploadFiles(UploadFilesData data, List<MultipartFile> files) {
   FormData formData = new FormData.fromMap({
-    "title": data.title,
-    "description": data.description,
+    //formdata from map ignores empty strings, so "" -> " "
+    "title": data.title == "" ? " " : data.title,
+    "description": data.description == "" ? " " : data.description,
     "files": files,
-    "tag": data.tag,
+    "tag": data.tag == "" ? " " : data.tag,
     "compressed": data.compressed
   });
   backend.post(formData, '/images/');
