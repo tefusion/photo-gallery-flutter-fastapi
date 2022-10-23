@@ -86,7 +86,7 @@ class ImageServer:
         sqlLimit = " LIMIT %s " + f"OFFSET %s"
         order_mode = ""
         if tag == None:
-            sql = "SELECT * FROM image "
+            sql = "SELECT title, description, uuid, type, time_created FROM image "
 
             if sort_mode == SortMode.DATE:
                 order_mode = "ORDER BY id"  # was ORDER BY time_created before
@@ -118,10 +118,10 @@ class ImageServer:
             data = {}
 
             if (tag == "_" or tag == " "):  # get all untagged images
-                if (order_mode == "it.pos"):  # TODO find better way 2 fix
+                if (order_mode == "it.pos"):
                     order_mode = "img.id DESC"
                 sql = f"""
-                SELECT img.*
+                SELECT img.title, img.description, img.uuid, img.type, img.time_created
                 FROM image img
                 WHERE img.id not in (SELECT image_id FROM tagmap) 
                 ORDER BY {order_mode} 
@@ -129,7 +129,7 @@ class ImageServer:
                 mycursor.execute(sql+sqlLimit)
             else:  # get images with tag
                 sql = f"""
-                SELECT img.*
+                SELECT img.title, img.description, img.uuid, img.type, img.time_created
                 FROM tagmap it, image img, tag t
                 WHERE it.tag_id = t.tag_id
                 AND t.tname = %s
@@ -166,7 +166,7 @@ class ImageServer:
         elif sort_mode == SortMode.DATE_REVERSE:
             order_mode = "tm.id DESC"  # descending was ORDER BY time_created DESC before
         elif sort_mode == SortMode.RANDOM:
-            order_mode = "RAND("+str(random_id)+")"
+            order_mode = "RAND("+str(self.random_id)+")"
         elif sort_mode == SortMode.POPULARITY:
             order_mode = "tmGrouped.size DESC"
 
@@ -177,7 +177,7 @@ class ImageServer:
 
         if tag == "":
             sql = f"""
-            SELECT  img.file_path, img.id, tm.tag_id, t.tname
+            SELECT  img.uuid, img.type, tm.tag_id, t.tname
             FROM (SELECT MIN(pos) AS pos, tag_id, MAX(pos) as size FROM tagmap GROUP BY tag_id) tmGrouped,
                 tag t, image img, tagmap tm
             WHERE tmGrouped.tag_id=tm.tag_id
@@ -213,7 +213,7 @@ class ImageServer:
         mycursor.close()
         return return_dict
 
-    def add_image_to_table(self, file_name: str, title: str, description: str) -> int:
+    def add_image_to_table(self, file_uuid: str, file_type: str, title: str, description: str) -> int:
         """Call after saving file for both image and thumbnail
 
         Args:
@@ -224,8 +224,8 @@ class ImageServer:
         """
         mycursor = self.db.cursor()
         now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        sql = "INSERT INTO image (title, description, file_path, time_created) VALUES (%s, %s, %s, %s)"
-        val = (title, description, file_name, now)
+        sql = "INSERT INTO image (uuid, type, title, description, time_created) VALUES (%s, %s, %s, %s, %s)"
+        val = (file_uuid, file_type, title, description, now)
         mycursor.execute(sql, val)
 
         image_id = mycursor.lastrowid
@@ -262,28 +262,39 @@ class ImageServer:
         if tag != "" and tag != " ":
             tag_data = TagData(tag=tag, images=[])
         for file_name in file_names:
-            image_id = self.add_image_to_table(file_name, title, description)
+            file_uuid: str = file_name.split(".")[0]
+            file_type: str = file_name.split(".")[1]
+            image_id = self.add_image_to_table(
+                file_uuid, file_type, title, description)
             if tag != "" and tag != " ":
-                tag_data.images.append(image_id)
+                tag_data.images.append(file_uuid)
 
         if tag != "" and tag != " ":
             self.tag_images(tag_data=tag_data)
 
-    def delete_image(self, image_id: int):
+    async def delete_image(self, image_uuid: str):
         mycursor = self.db.cursor()
         mycursor.execute(
-            "SELECT file_path FROM image WHERE id=%s", (image_id, ))
+            "SELECT id, type FROM image WHERE uuid=%s", (image_uuid, ))
         try:
+            normal_id = None
             for row in mycursor:
-                file_path = row[0]
-            mycursor.execute("DELETE FROM image WHERE id=%s", (image_id, ))
+                normal_id = row[0]
+                file_type = row[1]
+
+            if normal_id == None:
+                return Response(None, 404)
+
+            mycursor.execute("DELETE FROM image WHERE uuid=%s", (image_uuid, ))
             mycursor.execute(
-                "DELETE FROM tagmap WHERE image_id=%s", (image_id,))
+                "DELETE FROM tagmap WHERE image_id=%s", (normal_id,))
             self.db.commit()
-            self.file_handler.remove_image(file_path)
+
+            self.file_handler.remove_image(image_uuid+"."+file_type)
+            return Response(None, 200)
 
         except:
-            pass
+            return Response(None, 500)
 
         finally:
             mycursor.close()
@@ -331,11 +342,14 @@ class ImageServer:
 
         sql = "SELECT image_id FROM tagmap where tag_id="+str(tag_id)
         mycursor.execute(sql)
-        taggedImageIds = []
+        tagged_image_ids = []
         for row in mycursor:
-            taggedImageIds.append(row[0])
-        for posAdd, image_id in enumerate(tag_data.images):
-            if image_id not in taggedImageIds:
+            tagged_image_ids.append(row[0])
+        for posAdd, image_uuid in enumerate(tag_data.images):
+            image_id = self.get_id_from_uuid(image_uuid)
+            if image_id == None:
+                continue
+            if image_id not in tagged_image_ids:
                 sql = "INSERT INTO tagmap (image_id, tag_id, pos) VALUES (%s, %s, %s)"
                 val = (image_id, tag_id, last_pos+posAdd)
                 mycursor.execute(sql, val)
@@ -358,16 +372,17 @@ class ImageServer:
         if tag_id == None:
             return {}
 
-        for image_id in tag_data.images:
-            sql = f"""
+        for image_uuid in tag_data.images:
+            image_id = self.get_id_from_uuid(image_uuid)
+            sql = """
                 DELETE FROM tagmap
-                    WHERE tag_id={tag_id}
-                    AND image_id={image_id};
+                    WHERE tag_id=%s
+                    AND image_id=%s;
                     """
-            mycursor.execute(sql)
+            mycursor.execute(sql, (tag_id, image_id, ))
         self.db.commit()
         mycursor.close()
-        return {}
+        return Response(None, 200)
 
     def get_tags_starting_with_pattern(self, tag_start: str):
         """
@@ -415,7 +430,9 @@ class ImageServer:
 
     # reordering Images within Tag
     # TODO add different modes
-    def reorder_images(self, id_ship, id_destination, mode, tagname):
+    def reorder_images(self, uuid_ship: str, uuid_destination: str, mode, tagname):
+        id_ship = self.get_id_from_uuid(uuid_ship)
+        id_destination = self.get_id_from_uuid(uuid_destination)
         mycursor = self.db.cursor()
         # drag Ship in front of destination
         mycursor.callproc('dragInFrontOfOtherImage',
@@ -423,3 +440,16 @@ class ImageServer:
 
         self.db.commit()
         mycursor.close()
+        return Response(None, 200)
+
+    def get_id_from_uuid(self, uuid: str) -> int:
+        mycursor = self.db.cursor()
+        mycursor.execute(
+            "SELECT id FROM image WHERE uuid=%s", (uuid, ))
+
+        row = mycursor.fetchone()
+        image_id = None
+        mycursor.close()
+        if row != None:
+            image_id = row[0]
+        return image_id

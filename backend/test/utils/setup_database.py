@@ -11,7 +11,8 @@ TABLES['image'] = """
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `title` varchar(20),
   `description` varchar(100),
-  `file_path` varchar(100) NOT NULL,
+  `uuid` char(36) NOT NULL,
+  `type` varchar(10) NOT NULL,
   `time_created` datetime,
   PRIMARY KEY (`id`)
 );

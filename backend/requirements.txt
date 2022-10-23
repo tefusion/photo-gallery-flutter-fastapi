@@ -4,3 +4,7 @@ aiofiles
 mysql-connector-python
 python-dotenv
 Pillow
+
+#for testing
+requests
+pytest

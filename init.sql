@@ -1,13 +1,20 @@
 DELIMITER //
 
-CREATE DATABASE images;
+
+CREATE DATABASE IF NOT EXISTS images;
 USE images;
+
+DROP PROCEDURE IF EXISTS dragInFrontOfOtherImage;
+DROP TABLE IF EXISTS image;
+DROP TABLE IF EXISTS tag;
+DROP TABLE IF EXISTS tagmap;
 
 CREATE TABLE `image` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `title` varchar(20),
   `description` varchar(100),
-  `file_path` varchar(100) NOT NULL,
+  `uuid` char(36) NOT NULL,
+  `type` varchar(10) NOT NULL,
   `time_created` datetime,
   PRIMARY KEY (`id`)
 );
@@ -67,9 +74,6 @@ SELECT @posDestination:=tm.pos FROM tagmap tm WHERE tm.tag_id=@tagId AND tm.imag
     END IF;
 
     
-
-
-
  END//
  
  DELIMITER ;

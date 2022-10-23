@@ -1,3 +1,4 @@
+from ast import Str
 from fastapi import File, UploadFile
 from pydantic import BaseModel
 from typing import Optional, List
@@ -51,7 +52,7 @@ class MultiFileData(BaseModel):
 
 class TagData(BaseModel):
     tag: str = None
-    images: List[int] = []
+    images: List[str] = []
 
 
 class SortMode(Enum):

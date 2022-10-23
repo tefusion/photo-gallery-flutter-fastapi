@@ -63,29 +63,26 @@ async def upload_images(title: str = Form(...), description: str = Form(...),
     return await imageServer.upload_multiple_images(multi_file_data)
 
 
-@app.delete("/image/{image_id}")
-async def delete_image(image_id: str):
-    imageServer.delete_image(image_id)
-    return Response(None, 200)
+@app.delete("/image/{image_uuid}")
+async def delete_image(image_uuid: str):
+    return await imageServer.delete_image(image_uuid)
 
 
 @app.post("/tag/")
-async def tag_images(tag: str = Form(...), images: List[int] = Form(...)):
+async def tag_images(tag: str = Form(...), images: List[str] = Form(...)):
     tagData = TagData(tag=tag, images=images)
-    imageServer.tag_images(tagData)
-    return Response(None, 200)
+    return imageServer.tag_images(tagData)
 
 
 @app.post("/untag/")
-async def untag_images(tag: str = Form(...), images: List[int] = Form(...)):
+async def untag_images(tag: str = Form(...), images: List[str] = Form(...)):
     tagData = TagData(tag=tag, images=images)
     return imageServer.remove_image_from_tag(tagData)
 
 
 @app.put("/reorder/{tagname}/{idShip}")
-async def reorder_images(tagname: str, idShip: int, idDestination: int, mode: int = 1):
-    imageServer.reorder_images(idShip, idDestination, mode, tagname)
-    return Response(None, 200)
+async def reorder_images(tagname: str, uuid_ship: str, uuid_destination: str, mode: int = 1):
+    return imageServer.reorder_images(uuid_ship, uuid_destination, mode, tagname)
 
 
 @app.put("/tagname/{oldTagName}")

@@ -31,7 +31,7 @@ pip install -r requirements.txt
 
 enter your Database/MySQL password in a .env file in the backend folder like DB_PASSWORD=...
 
-then you can run uvicorn main:app inside of the app folder
+then you can run uvicorn app.main:app
 
 ### MySQL
 
